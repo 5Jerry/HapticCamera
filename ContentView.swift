@@ -3,10 +3,11 @@ import CoreHaptics
 
 struct ContentView: View {
     private let initialIntensity: Float = 1.0
-    private let initialSharpness: Float = 0.5
+    private let initialSharpness: Float = 0.3
     
     @State private var engine: CHHapticEngine?
-    @State private var hapticsIntensity: Float = 0
+    @State private var hapticSwitch: Bool = false
+    @State private var hapticsIntensity: Float = 0.3
     @State private var continuousPlayer: CHHapticAdvancedPatternPlayer!
     
     // Timer to handle transient haptic playback:
@@ -19,12 +20,12 @@ struct ContentView: View {
                 .foregroundColor(.accentColor)
             Text("Hello, world!")
             
-            Slider(value: $hapticsIntensity, in: 0...1.0)
+            Slider(value: $hapticsIntensity, in: 0.3...1.0)
             
             Button("Test haptics") {
                 // testHaptic()
                 // complexSuccess()
-                createContinuousHapticPlayer()
+                hapticSwitch.toggle()
                 transientPalettePressed()
             }
         }
@@ -47,42 +48,8 @@ struct ContentView: View {
         }
     }
     
-    func createContinuousHapticPlayer() {
-        // Create an intensity parameter:
-        let intensity = CHHapticEventParameter(parameterID: .hapticIntensity, value: initialIntensity)
-        
-        // Create a sharpness parameter:
-        let sharpness = CHHapticEventParameter(parameterID: .hapticSharpness, value: initialSharpness)
-        
-        // Create a continuous event with a long duration from the parameters.
-        let continuousEvent = CHHapticEvent(eventType: .hapticContinuous,
-                                            parameters: [intensity, sharpness],
-                                            relativeTime: 0,
-                                            duration: 100)
-        
-        do {
-            // Create a pattern from the continuous haptic event.
-            let pattern = try CHHapticPattern(events: [continuousEvent], parameters: [])
-            
-            // Create a player from the continuous haptic pattern.
-            continuousPlayer = try engine?.makeAdvancedPlayer(with: pattern)
-            
-        } catch let error {
-            print("Pattern Player Creation Error: \(error)")
-        }
-    }
-    
     func transientPalettePressed() {
-        
-//        switch press.state {
-//            
-//        case .began:
-            
-            // On first touch down, always play the haptic.
-            playHapticTransient(time: 0,
-                                intensity: hapticsIntensity,
-                                sharpness: 0.5)
-            
+        if hapticSwitch {
             // Create a timer to play subsequent transient patterns in succession.
             transientTimer?.cancel()
             transientTimer = DispatchSource.makeTimerSource(queue: .main)
@@ -92,27 +59,14 @@ struct ContentView: View {
             
             timer.schedule(deadline: .now() + .milliseconds(750), repeating: .milliseconds(600))
             timer.setEventHandler() {
-                
-                // Recalibrate sharpness and intensity each time the timer fires.
-                // let (sharpness, intensity) = self.sharpnessAndIntensityAt(location: newLocation, in: self.transientPalette)
-                
-                self.playHapticTransient(time: CHHapticTimeImmediate,
-                                         intensity: self.hapticsIntensity,
-                                         sharpness: 0.5)
+                self.playHapticTransient(time: CHHapticTimeImmediate, intensity: hapticsIntensity, sharpness: initialSharpness)
             }
             
-            // Activate the timer.
             timer.resume()
-            
-//        case .ended, .cancelled:
-            
-//            // Stop the transient timer.
-//            transientTimer?.cancel()
-//            transientTimer = nil
-            
-//        default:
-//            break
-//        }
+        } else {
+            transientTimer?.cancel()
+            transientTimer = nil
+        }
     }
     
     /// - Tag: PlayTransientPattern
