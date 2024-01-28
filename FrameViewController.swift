@@ -10,6 +10,10 @@ import UIKit
 import AVFoundation
 import Vision
 
+protocol BoxCenterDelegate {
+    func setBoxCenter(midX: CGFloat?, midY: CGFloat?)
+}
+
 class FrameViewController: UIViewController {
     
     private var faceDetectBoxes: [CAShapeLayer] = []
@@ -21,6 +25,8 @@ class FrameViewController: UIViewController {
     private let sessionQueue = DispatchQueue(label: "sessionQueue")
     private var previewLayer = AVCaptureVideoPreviewLayer()
     var screenDimensions: CGRect! = nil
+    
+    var delegate: BoxCenterDelegate?
     
     override func viewDidLoad() {
         self.checkPermission()
@@ -118,7 +124,7 @@ class FrameViewController: UIViewController {
             }
             
             guard let faceDetectionRequest = request as? VNDetectFaceRectanglesRequest,
-                  let results = faceDetectionRequest.results else {
+                  var results = faceDetectionRequest.results else {
                     return
             }
             
@@ -139,26 +145,53 @@ class FrameViewController: UIViewController {
     func drawFaceDetectBoxes(observedFaces: [VNFaceObservation]) {
         clearBoxes()
         
-        // Draw the boxes
-        let facesBoundingBoxes: [CAShapeLayer] = observedFaces.map({ (observedFace: VNFaceObservation) -> CAShapeLayer in
-            // Get box boundary from VNFaceObservation
-            let faceBoundingBoxOnScreen = previewLayer.layerRectConverted(fromMetadataOutputRect: observedFace.boundingBox)
-            let faceBoundingBoxPath = CGPath(rect: faceBoundingBoxOnScreen, transform: nil)
-            let faceBoundingBoxShape = CAShapeLayer()
-              
-            // Set properties of the box shape
-            faceBoundingBoxShape.path = faceBoundingBoxPath
-            faceBoundingBoxShape.fillColor = UIColor.clear.cgColor
-            faceBoundingBoxShape.strokeColor = UIColor.green.cgColor
-              
-            return faceBoundingBoxShape
-        })
+//        // Draw the boxes
+//        let facesBoundingBoxes: [CAShapeLayer] = observedFaces.map({ (observedFace: VNFaceObservation) -> CAShapeLayer in
+//            // Get box boundary from VNFaceObservation
+//            let faceBoundingBoxOnScreen = previewLayer.layerRectConverted(fromMetadataOutputRect: observedFace.boundingBox)
+//            let faceBoundingBoxPath = CGPath(rect: faceBoundingBoxOnScreen, transform: nil)
+//            let faceBoundingBoxShape = CAShapeLayer()
+//            
+//            var midX = CGRectGetMidX(faceBoundingBoxOnScreen)
+//            var midY = CGRectGetMidY(faceBoundingBoxOnScreen)
+//              
+//            // Set properties of the box shape
+//            faceBoundingBoxShape.path = faceBoundingBoxPath
+//            faceBoundingBoxShape.fillColor = UIColor.clear.cgColor
+//            faceBoundingBoxShape.strokeColor = UIColor.green.cgColor
+//              
+//            return faceBoundingBoxShape
+//        })
+//        
+//        // Add boxes to the view layer and the array
+//        facesBoundingBoxes.forEach { faceBoundingBox in
+//            view.layer.addSublayer(faceBoundingBox)
+//            faceDetectBoxes = facesBoundingBoxes
+//        }
+        
+        // Draw the box of the first face detected
+        
+        // Get box boundary from VNFaceObservation
+        guard let faceBoundingBox: VNFaceObservation = observedFaces.first else {
+            return
+        }
+        let faceBoundingBoxOnScreen = previewLayer.layerRectConverted(fromMetadataOutputRect: faceBoundingBox.boundingBox)
+        let faceBoundingBoxPath = CGPath(rect: faceBoundingBoxOnScreen, transform: nil)
+        let faceBoundingBoxShape = CAShapeLayer()
+        
+        delegate?.setBoxCenter(midX: CGRectGetMidX(faceBoundingBoxOnScreen), midY: CGRectGetMidY(faceBoundingBoxOnScreen))
+          
+        // Set properties of the box shape
+        faceBoundingBoxShape.path = faceBoundingBoxPath
+        faceBoundingBoxShape.fillColor = UIColor.clear.cgColor
+        faceBoundingBoxShape.strokeColor = UIColor.green.cgColor
+        
         
         // Add boxes to the view layer and the array
-        facesBoundingBoxes.forEach { faceBoundingBox in
-            view.layer.addSublayer(faceBoundingBox)
-            faceDetectBoxes = facesBoundingBoxes
-        }
+        let singleFaceBoundingBoxShape: [CAShapeLayer] = [faceBoundingBoxShape]
+//        singleFaceBoundingBoxShape.append(faceBoundingBoxShape)
+        view.layer.addSublayer(faceBoundingBoxShape)
+        faceDetectBoxes = singleFaceBoundingBoxShape
     }
     
     func clearBoxes() {
@@ -176,12 +209,35 @@ extension FrameViewController: AVCaptureVideoDataOutputSampleBufferDelegate {
     }
 }
 
-struct FrameView: UIViewControllerRepresentable {
+struct FrameViewControllerRepresentable: UIViewControllerRepresentable {
+    @Binding var faceDetectBoxPosition: CGPoint?
+    
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+    
     func makeUIViewController(context: Context) -> UIViewController {
-        return FrameViewController()
+        let frameViewController = FrameViewController()
+        frameViewController.delegate = context.coordinator
+        return frameViewController
     }
 
     func updateUIViewController(_ uiViewController: UIViewController, context: Context) {
+        
+    }
+    
+    class Coordinator: NSObject, BoxCenterDelegate {
+        var parent: FrameViewControllerRepresentable
+        
+        init(_ uiViewController: FrameViewControllerRepresentable) {
+            parent = uiViewController
+        }
+        
+        func setBoxCenter(midX: CGFloat?, midY: CGFloat?) {
+            if midX != nil, midY != nil {
+                parent.faceDetectBoxPosition = CGPoint(x: midX!, y: midY!)
+            }
+        }
     }
 }
 

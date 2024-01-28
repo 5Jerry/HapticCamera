@@ -9,8 +9,14 @@ struct ContentView: View {
 //            .ignoresSafeArea()
 //    }
     
+    @State var faceDetectBoxPosition: CGPoint?
+    
     var body: some View {
-        FrameView()
+        FrameViewControllerRepresentable(faceDetectBoxPosition: $faceDetectBoxPosition)
             .ignoresSafeArea()
+            .onTapGesture { location in
+                print("1234 Tapped at \(location)")
+                print("1234 face box center position \(String(describing: faceDetectBoxPosition))")
+            }
     }
 }
