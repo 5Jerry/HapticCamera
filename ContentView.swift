@@ -12,7 +12,7 @@ struct ContentView: View {
 //    }
     private let initialSharpness: Float = 0.3
     
-    @State var hapticsIntensity: Float = 0.35
+    @State var hapticsIntensity: Float = 0.0
     @State private var engine: CHHapticEngine?
     @State var faceDetectBoxPosition: CGPoint = CGPoint(x: 0, y: 0)
     @State var tappedLocation: CGPoint = CGPoint(x: UIScreen.main.bounds.midX, y: UIScreen.main.bounds.midY)
@@ -30,11 +30,12 @@ struct ContentView: View {
                     print("1234 Tapped at \(location)")
                     print("1234 face box center position \(String(describing: faceDetectBoxPosition))")
                 }
-                .onAppear(perform: prepareHaptics)
+//                .onAppear(perform: prepareHaptics)
             VStack {
                 Text("Tapped location X: \(tappedLocation.x) Y: \(tappedLocation.y)")
                 Text("Face location X: \(faceDetectBoxPosition.x) Y: \(faceDetectBoxPosition.y)")
                 Text("Tap and face distance: \(tapFaceDistance ?? 99999)")
+                Text("HapticsIntensity: \(hapticsIntensity)")
             }
         }
     }
