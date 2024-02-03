@@ -124,7 +124,7 @@ class FrameViewController: UIViewController {
             }
             
             guard let faceDetectionRequest = request as? VNDetectFaceRectanglesRequest,
-                  var results = faceDetectionRequest.results else {
+                  let results = faceDetectionRequest.results else {
                     return
             }
             
@@ -210,7 +210,10 @@ extension FrameViewController: AVCaptureVideoDataOutputSampleBufferDelegate {
 }
 
 struct FrameViewControllerRepresentable: UIViewControllerRepresentable {
-    @Binding var faceDetectBoxPosition: CGPoint?
+    @Binding var faceDetectBoxPosition: CGPoint
+    @Binding var tappedLocation: CGPoint
+    @Binding var tapFaceDistance: CGFloat?
+    @Binding var hapticsIntensity: Float
     
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
@@ -236,6 +239,32 @@ struct FrameViewControllerRepresentable: UIViewControllerRepresentable {
         func setBoxCenter(midX: CGFloat?, midY: CGFloat?) {
             if midX != nil, midY != nil {
                 parent.faceDetectBoxPosition = CGPoint(x: midX!, y: midY!)
+                
+                // Calculate distance between tapped location and face center
+                parent.tapFaceDistance = sqrt(pow(parent.tappedLocation.x - midX!, 2) + pow(parent.tappedLocation.y - midY!, 2))
+                if parent.tapFaceDistance != nil {
+                    if parent.tapFaceDistance! < 10 {
+                        parent.hapticsIntensity = 1
+                    } else if parent.tapFaceDistance! >= 10 && parent.tapFaceDistance! < 50 {
+                        parent.hapticsIntensity = 0.9
+                    } else if parent.tapFaceDistance! >= 50 && parent.tapFaceDistance! < 100 {
+                        parent.hapticsIntensity = 0.8
+                    } else if parent.tapFaceDistance! >= 100 && parent.tapFaceDistance! < 150 {
+                        parent.hapticsIntensity = 0.7
+                    } else if parent.tapFaceDistance! >= 150 && parent.tapFaceDistance! < 200 {
+                        parent.hapticsIntensity = 0.6
+                    } else if parent.tapFaceDistance! >= 200 && parent.tapFaceDistance! < 250 {
+                        parent.hapticsIntensity = 0.55
+                    } else if parent.tapFaceDistance! >= 250 && parent.tapFaceDistance! < 300 {
+                        parent.hapticsIntensity = 0.5
+                    } else if parent.tapFaceDistance! >= 300 && parent.tapFaceDistance! < 350 {
+                        parent.hapticsIntensity = 0.45
+                    } else if parent.tapFaceDistance! >= 350 && parent.tapFaceDistance! < 400 {
+                        parent.hapticsIntensity = 0.4
+                    } else {
+                        parent.hapticsIntensity = 0.35
+                    }
+                }
             }
         }
     }
