@@ -10,7 +10,7 @@ import AppleProductTypes
 let package = Package(
     name: "HapticCamera",
     platforms: [
-        .iOS("16.0")
+        .iOS("16.4")
     ],
     products: [
         .iOSApplication(

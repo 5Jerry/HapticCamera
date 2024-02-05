@@ -269,50 +269,43 @@ class FrameViewController: UIViewController {
     func takePhoto() {
         sessionQueue.async {
         
-//            var photoSettings = AVCapturePhotoSettings()
-//
-//            if self.photoOutput.availablePhotoCodecTypes.contains(.hevc) {
-//                photoSettings = AVCapturePhotoSettings(format: [AVVideoCodecKey: AVVideoCodecType.hevc])
-//            }
-//            
-//            let isFlashAvailable = self.deviceInput?.device.isFlashAvailable ?? false
-//            photoSettings.flashMode = isFlashAvailable ? .auto : .off
-////            photoSettings.isHighResolutionPhotoEnabled = true
-//            
-//            if let maxPhotoDimensions = self.captureDevice?.activeFormat.formatDescription {
-//                photoSettings.maxPhotoDimensions = CMVideoFormatDescriptionGetDimensions(maxPhotoDimensions)
-//                print("5555 maxPhotoDimensions width: \(CMVideoFormatDescriptionGetDimensions(maxPhotoDimensions).width) maxPhotoDimensions height: \(CMVideoFormatDescriptionGetDimensions(maxPhotoDimensions).height)")
-//            }
-//            
-////            if let previewPhotoPixelFormatType = photoSettings.availablePreviewPhotoPixelFormatTypes.first {
-////                photoSettings.previewPhotoFormat = [kCVPixelBufferPixelFormatTypeKey as String: previewPhotoPixelFormatType]
-////            }
-//            
-//            if photoSettings.availablePreviewPhotoPixelFormatTypes.count > 0 {
-//                photoSettings.previewPhotoFormat = [
-//                    kCVPixelBufferPixelFormatTypeKey : photoSettings.availablePreviewPhotoPixelFormatTypes.first!,
-//                    kCVPixelBufferWidthKey : 1920,
-//                    kCVPixelBufferHeightKey : 1080
-//                ] as [String: Any]
-//            }
-//            
-//            photoSettings.photoQualityPrioritization = .quality
-//            
-//            if let photoOutputVideoConnection = self.photoOutput.connection(with: .video) {
-//                if photoOutputVideoConnection.isVideoOrientationSupported,
-//                    let videoOrientation = self.videoOrientationFor(self.deviceOrientation) {
-//                    photoOutputVideoConnection.videoOrientation = videoOrientation
-//                }
-//            }
-//            
-//            self.photoOutput.capturePhoto(with: photoSettings, delegate: self)
-            
-            
-            let photoSettings = AVCapturePhotoSettings()
-            if let photoPreviewType = photoSettings.availablePreviewPhotoPixelFormatTypes.first {
-                photoSettings.previewPhotoFormat = [kCVPixelBufferPixelFormatTypeKey as String: photoPreviewType]
-                self.photoOutput.capturePhoto(with: photoSettings, delegate: self)
+            var photoSettings = AVCapturePhotoSettings()
+
+            if self.photoOutput.availablePhotoCodecTypes.contains(.hevc) {
+                photoSettings = AVCapturePhotoSettings(format: [AVVideoCodecKey: AVVideoCodecType.hevc])
             }
+            
+            let isFlashAvailable = self.deviceInput?.device.isFlashAvailable ?? false
+            photoSettings.flashMode = isFlashAvailable ? .auto : .off
+//            photoSettings.isHighResolutionPhotoEnabled = true
+            
+            if let maxPhotoDimensions = self.captureDevice?.activeFormat.formatDescription {
+                photoSettings.maxPhotoDimensions = CMVideoFormatDescriptionGetDimensions(maxPhotoDimensions)
+                print("5555 maxPhotoDimensions width: \(CMVideoFormatDescriptionGetDimensions(maxPhotoDimensions).width) maxPhotoDimensions height: \(CMVideoFormatDescriptionGetDimensions(maxPhotoDimensions).height)")
+            }
+            
+//            if let previewPhotoPixelFormatType = photoSettings.availablePreviewPhotoPixelFormatTypes.first {
+//                photoSettings.previewPhotoFormat = [kCVPixelBufferPixelFormatTypeKey as String: previewPhotoPixelFormatType]
+//            }
+            
+            if photoSettings.availablePreviewPhotoPixelFormatTypes.count > 0 {
+                photoSettings.previewPhotoFormat = [
+                    kCVPixelBufferPixelFormatTypeKey : photoSettings.availablePreviewPhotoPixelFormatTypes.first!,
+                    kCVPixelBufferWidthKey : 1920,
+                    kCVPixelBufferHeightKey : 1080
+                ] as [String: Any]
+            }
+            
+            photoSettings.photoQualityPrioritization = .quality
+            
+            if let photoOutputVideoConnection = self.photoOutput.connection(with: .video) {
+                if photoOutputVideoConnection.isVideoOrientationSupported,
+                    let videoOrientation = self.videoOrientationFor(self.deviceOrientation) {
+                    photoOutputVideoConnection.videoOrientation = videoOrientation
+                }
+            }
+            
+            self.photoOutput.capturePhoto(with: photoSettings, delegate: self)
         }
     }
     
@@ -349,6 +342,7 @@ struct FrameViewControllerRepresentable: UIViewControllerRepresentable {
     @Binding var tapFaceDistance: CGFloat?
     @Binding var hapticsIntensity: Float
     @Binding var previewPhoto: UIImage?
+    @Binding var showPhoto: Bool
     
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
@@ -418,6 +412,7 @@ struct FrameViewControllerRepresentable: UIViewControllerRepresentable {
             guard let imageData = photo.fileDataRepresentation() else { return }
             guard let uiImage = UIImage(data: imageData) else { return }
             parent.previewPhoto = uiImage
+            parent.showPhoto = true
         }
     }
 }

@@ -19,13 +19,15 @@ struct ContentView: View {
     @State var tapFaceDistance: CGFloat?
     @State var previewPhoto: UIImage?
     
+    @State private var showPhoto = false
+    
     // Timer to handle transient haptic playback:
     @State private var transientTimer: DispatchSourceTimer?
     
     var body: some View {
         ZStack{
-            FrameViewControllerRepresentable(faceDetectBoxPosition: $faceDetectBoxPosition, tappedLocation: $tappedLocation, tapFaceDistance: $tapFaceDistance, hapticsIntensity: $hapticsIntensity, previewPhoto: $previewPhoto)
-                .ignoresSafeArea()
+            FrameViewControllerRepresentable(faceDetectBoxPosition: $faceDetectBoxPosition, tappedLocation: $tappedLocation, tapFaceDistance: $tapFaceDistance, hapticsIntensity: $hapticsIntensity, previewPhoto: $previewPhoto, showPhoto: $showPhoto)
+//                .ignoresSafeArea()
                 .onTapGesture { location in
                     tappedLocation = location
                     print("1234 Tapped at \(location)")
@@ -38,13 +40,45 @@ struct ContentView: View {
                 Text("Tap and face distance: \(tapFaceDistance ?? 99999)")
                 Text("HapticsIntensity: \(hapticsIntensity)")
             }
-            
-            if previewPhoto != nil {
-                Image(uiImage: previewPhoto!)
-//                    .frame(width: 100, height: 100)
-                    .resizable()
-                    .scaledToFit()
+        }
+        .popover(isPresented: $showPhoto,
+                 content: {
+            ZStack(alignment: .topTrailing) {
+                if previewPhoto != nil {
+                    Image(uiImage: previewPhoto!)
+                        .resizable()
+                        .scaledToFit()
+                }
+                
+                HStack {
+                    Button(action: {
+                        
+                    }) {
+                        Image(systemName: "square.and.arrow.down")
+                    }
+                    .frame(width: 40, height: 40)
+                    
+                    Button(action: {
+                        showPhoto = false
+                    }) {
+                        Image(systemName: "xmark")
+                    }
+                    .frame(width: 40, height: 40)
+                }
+                .frame(width: 100, height: 40, alignment: .topTrailing)
             }
+            .presentationCompactAdaptation(.fullScreenCover)
+        })
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            Button(action: {
+                
+            }) {
+                Text("Clear tap position")
+            }
+            .frame(width: 150, height: 20)
+            .padding(5)
+            .background(.black)
+            .cornerRadius(10)
         }
     }
     
