@@ -12,7 +12,7 @@ import Vision
 import CoreHaptics
 
 protocol BoxCenterDelegate {
-    func setBoxCenter(continuousPlayer: CHHapticAdvancedPatternPlayer?, midX: CGFloat?, midY: CGFloat?)
+    func setBoxCenter(tappedLocation: CGPoint?, midX: CGFloat?, midY: CGFloat?, tappedLocationAndFaceDistance: CGFloat?)
     func getPhoto(photo: AVCapturePhoto)
 }
 
@@ -36,7 +36,7 @@ class FrameViewController: UIViewController {
     private var engine: CHHapticEngine?
     private var continuousPlayer: CHHapticAdvancedPatternPlayer?
     
-    var takePhotoFlag = 0
+    var tappedLocation: CGPoint?
     
     private var deviceOrientation: UIDeviceOrientation {
         var orientation = UIDevice.current.orientation
@@ -50,10 +50,26 @@ class FrameViewController: UIViewController {
         self.createContinuousHapticPlayer()
         self.checkPermission()
         
+        let tap = UITapGestureRecognizer(target: self, action: #selector(touchedScreen(touch:)))
+        self.view.addGestureRecognizer(tap)
+        
         sessionQueue.async { [unowned self] in
             guard permissionGranted else { return }
             self.setupCaptureSession()
+        }
+        
+        self.startCaptureSession()
+    }
+    
+    func startCaptureSession() {
+        sessionQueue.async { [unowned self] in
             self.captureSession.startRunning()
+        }
+    }
+    
+    func stopCaptureSession() {
+        sessionQueue.async { [unowned self] in
+            self.captureSession.stopRunning()
         }
     }
     
@@ -140,6 +156,14 @@ class FrameViewController: UIViewController {
         }
     }
     
+    @objc func touchedScreen(touch: UITapGestureRecognizer) {
+        let touchPoint = touch.location(in: self.view)
+        print("1234 Tapped position x: \(touchPoint.x) Tapped position y: \(touchPoint.y)")
+        tappedLocation = touchPoint
+        
+        delegate?.setBoxCenter(tappedLocation: tappedLocation, midX: nil, midY: nil, tappedLocationAndFaceDistance: nil)
+    }
+    
     func setupCaptureSession() {
         // Camera input
 //        guard let videoDevice = AVCaptureDevice.default(.builtInUltraWideCamera, for: .video, position: .back) else { return }
@@ -194,7 +218,8 @@ class FrameViewController: UIViewController {
                     self.drawFaceDetectBoxes(observedFaces: results)
                 } else {
                     self.clearBoxes()
-                    self.delegate?.setBoxCenter(continuousPlayer: self.continuousPlayer, midX: nil, midY: nil)
+                    self.delegate?.setBoxCenter(tappedLocation: self.tappedLocation, midX: nil, midY: nil, tappedLocationAndFaceDistance: nil)
+                    self.setHapticsIntensity(tappedLocationAndFaceDistance: nil)
                 }
             }
         })
@@ -240,24 +265,29 @@ class FrameViewController: UIViewController {
         let faceBoundingBoxOnScreen = previewLayer.layerRectConverted(fromMetadataOutputRect: faceBoundingBox.boundingBox)
         let faceBoundingBoxPath = CGPath(rect: faceBoundingBoxOnScreen, transform: nil)
         let faceBoundingBoxShape = CAShapeLayer()
-        
-        delegate?.setBoxCenter(continuousPlayer: continuousPlayer, midX: CGRectGetMidX(faceBoundingBoxOnScreen), midY: CGRectGetMidY(faceBoundingBoxOnScreen))
           
         // Set properties of the box shape
         faceBoundingBoxShape.path = faceBoundingBoxPath
         faceBoundingBoxShape.fillColor = UIColor.clear.cgColor
         faceBoundingBoxShape.strokeColor = UIColor.green.cgColor
         
-        if takePhotoFlag == 0 {
-            takePhoto()
-        }
-        takePhotoFlag = 1
-        
         // Add boxes to the view layer and the array
         let singleFaceBoundingBoxShape: [CAShapeLayer] = [faceBoundingBoxShape]
 //        singleFaceBoundingBoxShape.append(faceBoundingBoxShape)
         view.layer.addSublayer(faceBoundingBoxShape)
         faceDetectBoxes = singleFaceBoundingBoxShape
+        
+        guard tappedLocation != nil else { return }
+        
+        let tappedLocationAndFaceDistance = sqrt(pow(tappedLocation!.x - CGRectGetMidX(faceBoundingBoxOnScreen), 2) + pow(tappedLocation!.y - CGRectGetMidY(faceBoundingBoxOnScreen), 2))
+        
+        setHapticsIntensity(tappedLocationAndFaceDistance: tappedLocationAndFaceDistance)
+        
+        delegate?.setBoxCenter(tappedLocation: tappedLocation, midX: CGRectGetMidX(faceBoundingBoxOnScreen), midY: CGRectGetMidY(faceBoundingBoxOnScreen), tappedLocationAndFaceDistance: tappedLocationAndFaceDistance)
+        
+        if tappedLocationAndFaceDistance < 10 {
+            takePhoto()
+        }
     }
     
     func clearBoxes() {
@@ -309,6 +339,43 @@ class FrameViewController: UIViewController {
         }
     }
     
+    func setHapticsIntensity(tappedLocationAndFaceDistance: CGFloat?) {
+        if tappedLocationAndFaceDistance != nil {
+            let hapticsIntensity = Float(1 - tappedLocationAndFaceDistance! / 800)
+            
+            // Create dynamic parameters for the updated intensity & sharpness.
+            let intensityParameter = CHHapticDynamicParameter(parameterID: .hapticIntensityControl,
+                                                              value: hapticsIntensity,
+                                                              relativeTime: 0)
+    
+            let sharpnessParameter = CHHapticDynamicParameter(parameterID: .hapticSharpnessControl,
+                                                              value: 0.5,
+                                                              relativeTime: 0)
+    
+            // Send dynamic parameters to the haptic player.
+            do {
+                try continuousPlayer?.sendParameters([intensityParameter, sharpnessParameter],
+                                                    atTime: CHHapticTimeImmediate)
+            } catch let error {
+                print("Dynamic Parameter Error: \(error)")
+            }
+            
+            do {
+                // Begin playing continuous pattern.
+                try continuousPlayer?.start(atTime: CHHapticTimeImmediate)
+            } catch let error {
+                print("Error starting the continuous haptic player: \(error)")
+            }
+        } else {
+            // Stop playing the haptic pattern.
+            do {
+                try continuousPlayer?.stop(atTime: CHHapticTimeImmediate)
+            } catch let error {
+                print("Error stopping the continuous haptic player: \(error)")
+            }
+        }
+    }
+    
     private func videoOrientationFor(_ deviceOrientation: UIDeviceOrientation) -> AVCaptureVideoOrientation? {
         switch deviceOrientation {
         case .portrait: return AVCaptureVideoOrientation.portrait
@@ -318,9 +385,6 @@ class FrameViewController: UIViewController {
         default: return nil
         }
     }
-    
-    
-    
 }
 
 extension FrameViewController: AVCaptureVideoDataOutputSampleBufferDelegate {
@@ -348,14 +412,19 @@ struct FrameViewControllerRepresentable: UIViewControllerRepresentable {
         Coordinator(self)
     }
     
-    func makeUIViewController(context: Context) -> UIViewController {
+    func makeUIViewController(context: Context) -> FrameViewController {
         let frameViewController = FrameViewController()
         frameViewController.delegate = context.coordinator
         return frameViewController
     }
 
-    func updateUIViewController(_ uiViewController: UIViewController, context: Context) {
-        
+    func updateUIViewController(_ frameViewController: FrameViewController, context: Context) {
+        if showPhoto {
+            frameViewController.stopCaptureSession()
+            frameViewController.setHapticsIntensity(tappedLocationAndFaceDistance: nil)
+        } else {
+            frameViewController.startCaptureSession()
+        }
     }
     
     class Coordinator: NSObject, BoxCenterDelegate {
@@ -365,46 +434,19 @@ struct FrameViewControllerRepresentable: UIViewControllerRepresentable {
             parent = uiViewController
         }
         
-        func setBoxCenter(continuousPlayer: CHHapticAdvancedPatternPlayer?, midX: CGFloat?, midY: CGFloat?) {
-            if midX != nil, midY != nil {
+        func setBoxCenter(tappedLocation: CGPoint?, midX: CGFloat?, midY: CGFloat?, tappedLocationAndFaceDistance: CGFloat?) {
+            if midX != nil && midY != nil {
                 parent.faceDetectBoxPosition = CGPoint(x: midX!, y: midY!)
+            }
+            
+            if tappedLocation != nil {
+                parent.tappedLocation = tappedLocation!
                 
-                // Calculate distance between tapped location and face center
-                parent.tapFaceDistance = sqrt(pow(parent.tappedLocation.x - midX!, 2) + pow(parent.tappedLocation.y - midY!, 2))
-                if parent.tapFaceDistance != nil {
-                    parent.hapticsIntensity = Float(1 - parent.tapFaceDistance! / 800)
-                }
-                
-                // Create dynamic parameters for the updated intensity & sharpness.
-                let intensityParameter = CHHapticDynamicParameter(parameterID: .hapticIntensityControl,
-                                                                  value: parent.hapticsIntensity,
-                                                                  relativeTime: 0)
-        
-                let sharpnessParameter = CHHapticDynamicParameter(parameterID: .hapticSharpnessControl,
-                                                                  value: 0.5,
-                                                                  relativeTime: 0)
-        
-                // Send dynamic parameters to the haptic player.
-                do {
-                    try continuousPlayer?.sendParameters([intensityParameter, sharpnessParameter],
-                                                        atTime: CHHapticTimeImmediate)
-                } catch let error {
-                    print("Dynamic Parameter Error: \(error)")
-                }
-                
-                do {
-                    // Begin playing continuous pattern.
-                    try continuousPlayer?.start(atTime: CHHapticTimeImmediate)
-                } catch let error {
-                    print("Error starting the continuous haptic player: \(error)")
-                }
-            } else {
-                // Stop playing the haptic pattern.
-                do {
-                    try continuousPlayer?.stop(atTime: CHHapticTimeImmediate)
-                } catch let error {
-                    print("Error stopping the continuous haptic player: \(error)")
-                }
+            }
+            
+            if tappedLocationAndFaceDistance != nil {
+                parent.tapFaceDistance = tappedLocationAndFaceDistance!
+                parent.hapticsIntensity = Float(1 - tappedLocationAndFaceDistance! / 800)
             }
         }
         
