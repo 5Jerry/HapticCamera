@@ -13,13 +13,17 @@ import CoreHaptics
 
 protocol BoxCenterDelegate {
     func setBoxCenter(continuousPlayer: CHHapticAdvancedPatternPlayer?, midX: CGFloat?, midY: CGFloat?)
+    func getPhoto(photo: AVCapturePhoto)
 }
 
 class FrameViewController: UIViewController {
     
     private var faceDetectBoxes: [CAShapeLayer] = []
     private var permissionGranted = true
+    private var captureDevice: AVCaptureDevice?
+    private var deviceInput: AVCaptureDeviceInput?
     private let videoOutput = AVCaptureVideoDataOutput()
+    private var photoOutput = AVCapturePhotoOutput()
     private let captureSession = AVCaptureSession()
     
     // Run capture session on a background thread
@@ -31,6 +35,16 @@ class FrameViewController: UIViewController {
     
     private var engine: CHHapticEngine?
     private var continuousPlayer: CHHapticAdvancedPatternPlayer?
+    
+    var takePhotoFlag = 0
+    
+    private var deviceOrientation: UIDeviceOrientation {
+        var orientation = UIDevice.current.orientation
+        if orientation == UIDeviceOrientation.unknown {
+            orientation = UIScreen.main.orientation
+        }
+        return orientation
+    }
     
     override func viewDidLoad() {
         self.createContinuousHapticPlayer()
@@ -128,9 +142,12 @@ class FrameViewController: UIViewController {
     
     func setupCaptureSession() {
         // Camera input
-        guard let videoDevice = AVCaptureDevice.default(.builtInDualWideCamera, for: .video, position: .back) else { return }
+//        guard let videoDevice = AVCaptureDevice.default(.builtInUltraWideCamera, for: .video, position: .back) else { return }
+        guard let videoDevice = AVCaptureDevice.default(for: AVMediaType.video) else { return }
+        captureDevice = videoDevice
         guard let videoDeviceInput = try? AVCaptureDeviceInput(device: videoDevice) else { return }
         guard captureSession.canAddInput(videoDeviceInput) else { return }
+        deviceInput = videoDeviceInput
         captureSession.addInput(videoDeviceInput)
                          
         // Preview layer
@@ -154,6 +171,10 @@ class FrameViewController: UIViewController {
         DispatchQueue.main.async { [weak self] in
             self!.view.layer.addSublayer(self!.previewLayer)
         }
+        
+        // Setup photo output
+        captureSession.addOutput(photoOutput)
+        photoOutput.maxPhotoQualityPrioritization = .quality
     }
     
     func detectFace(image: CVPixelBuffer) {
@@ -227,6 +248,10 @@ class FrameViewController: UIViewController {
         faceBoundingBoxShape.fillColor = UIColor.clear.cgColor
         faceBoundingBoxShape.strokeColor = UIColor.green.cgColor
         
+        if takePhotoFlag == 0 {
+            takePhoto()
+        }
+        takePhotoFlag = 1
         
         // Add boxes to the view layer and the array
         let singleFaceBoundingBoxShape: [CAShapeLayer] = [faceBoundingBoxShape]
@@ -241,6 +266,68 @@ class FrameViewController: UIViewController {
         }
     }
     
+    func takePhoto() {
+        sessionQueue.async {
+        
+//            var photoSettings = AVCapturePhotoSettings()
+//
+//            if self.photoOutput.availablePhotoCodecTypes.contains(.hevc) {
+//                photoSettings = AVCapturePhotoSettings(format: [AVVideoCodecKey: AVVideoCodecType.hevc])
+//            }
+//            
+//            let isFlashAvailable = self.deviceInput?.device.isFlashAvailable ?? false
+//            photoSettings.flashMode = isFlashAvailable ? .auto : .off
+////            photoSettings.isHighResolutionPhotoEnabled = true
+//            
+//            if let maxPhotoDimensions = self.captureDevice?.activeFormat.formatDescription {
+//                photoSettings.maxPhotoDimensions = CMVideoFormatDescriptionGetDimensions(maxPhotoDimensions)
+//                print("5555 maxPhotoDimensions width: \(CMVideoFormatDescriptionGetDimensions(maxPhotoDimensions).width) maxPhotoDimensions height: \(CMVideoFormatDescriptionGetDimensions(maxPhotoDimensions).height)")
+//            }
+//            
+////            if let previewPhotoPixelFormatType = photoSettings.availablePreviewPhotoPixelFormatTypes.first {
+////                photoSettings.previewPhotoFormat = [kCVPixelBufferPixelFormatTypeKey as String: previewPhotoPixelFormatType]
+////            }
+//            
+//            if photoSettings.availablePreviewPhotoPixelFormatTypes.count > 0 {
+//                photoSettings.previewPhotoFormat = [
+//                    kCVPixelBufferPixelFormatTypeKey : photoSettings.availablePreviewPhotoPixelFormatTypes.first!,
+//                    kCVPixelBufferWidthKey : 1920,
+//                    kCVPixelBufferHeightKey : 1080
+//                ] as [String: Any]
+//            }
+//            
+//            photoSettings.photoQualityPrioritization = .quality
+//            
+//            if let photoOutputVideoConnection = self.photoOutput.connection(with: .video) {
+//                if photoOutputVideoConnection.isVideoOrientationSupported,
+//                    let videoOrientation = self.videoOrientationFor(self.deviceOrientation) {
+//                    photoOutputVideoConnection.videoOrientation = videoOrientation
+//                }
+//            }
+//            
+//            self.photoOutput.capturePhoto(with: photoSettings, delegate: self)
+            
+            
+            let photoSettings = AVCapturePhotoSettings()
+            if let photoPreviewType = photoSettings.availablePreviewPhotoPixelFormatTypes.first {
+                photoSettings.previewPhotoFormat = [kCVPixelBufferPixelFormatTypeKey as String: photoPreviewType]
+                self.photoOutput.capturePhoto(with: photoSettings, delegate: self)
+            }
+        }
+    }
+    
+    private func videoOrientationFor(_ deviceOrientation: UIDeviceOrientation) -> AVCaptureVideoOrientation? {
+        switch deviceOrientation {
+        case .portrait: return AVCaptureVideoOrientation.portrait
+        case .portraitUpsideDown: return AVCaptureVideoOrientation.portraitUpsideDown
+        case .landscapeLeft: return AVCaptureVideoOrientation.landscapeRight
+        case .landscapeRight: return AVCaptureVideoOrientation.landscapeLeft
+        default: return nil
+        }
+    }
+    
+    
+    
 }
 
 extension FrameViewController: AVCaptureVideoDataOutputSampleBufferDelegate {
@@ -250,11 +337,18 @@ extension FrameViewController: AVCaptureVideoDataOutputSampleBufferDelegate {
     }
 }
 
+extension FrameViewController: AVCapturePhotoCaptureDelegate {
+    func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto, error: Error?) {
+        delegate?.getPhoto(photo: photo)
+    }
+}
+
 struct FrameViewControllerRepresentable: UIViewControllerRepresentable {
     @Binding var faceDetectBoxPosition: CGPoint
     @Binding var tappedLocation: CGPoint
     @Binding var tapFaceDistance: CGFloat?
     @Binding var hapticsIntensity: Float
+    @Binding var previewPhoto: UIImage?
     
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
@@ -318,6 +412,46 @@ struct FrameViewControllerRepresentable: UIViewControllerRepresentable {
                     print("Error stopping the continuous haptic player: \(error)")
                 }
             }
+        }
+        
+        func getPhoto(photo: AVCapturePhoto) {
+            guard let imageData = photo.fileDataRepresentation() else { return }
+            guard let uiImage = UIImage(data: imageData) else { return }
+            parent.previewPhoto = uiImage
+        }
+    }
+}
+
+fileprivate extension UIScreen {
+
+    var orientation: UIDeviceOrientation {
+        let point = coordinateSpace.convert(CGPoint.zero, to: fixedCoordinateSpace)
+        if point == CGPoint.zero {
+            return .portrait
+        } else if point.x != 0 && point.y != 0 {
+            return .portraitUpsideDown
+        } else if point.x == 0 && point.y != 0 {
+            return .landscapeRight //.landscapeLeft
+        } else if point.x != 0 && point.y == 0 {
+            return .landscapeLeft //.landscapeRight
+        } else {
+            return .unknown
+        }
+    }
+}
+
+fileprivate extension Image.Orientation {
+
+    init(_ cgImageOrientation: CGImagePropertyOrientation) {
+        switch cgImageOrientation {
+        case .up: self = .up
+        case .upMirrored: self = .upMirrored
+        case .down: self = .down
+        case .downMirrored: self = .downMirrored
+        case .left: self = .left
+        case .leftMirrored: self = .leftMirrored
+        case .right: self = .right
+        case .rightMirrored: self = .rightMirrored
         }
     }
 }

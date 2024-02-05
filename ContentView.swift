@@ -17,13 +17,14 @@ struct ContentView: View {
     @State var faceDetectBoxPosition: CGPoint = CGPoint(x: 0, y: 0)
     @State var tappedLocation: CGPoint = CGPoint(x: UIScreen.main.bounds.midX, y: UIScreen.main.bounds.midY)
     @State var tapFaceDistance: CGFloat?
+    @State var previewPhoto: UIImage?
     
     // Timer to handle transient haptic playback:
     @State private var transientTimer: DispatchSourceTimer?
     
     var body: some View {
         ZStack{
-            FrameViewControllerRepresentable(faceDetectBoxPosition: $faceDetectBoxPosition, tappedLocation: $tappedLocation, tapFaceDistance: $tapFaceDistance, hapticsIntensity: $hapticsIntensity)
+            FrameViewControllerRepresentable(faceDetectBoxPosition: $faceDetectBoxPosition, tappedLocation: $tappedLocation, tapFaceDistance: $tapFaceDistance, hapticsIntensity: $hapticsIntensity, previewPhoto: $previewPhoto)
                 .ignoresSafeArea()
                 .onTapGesture { location in
                     tappedLocation = location
@@ -36,6 +37,13 @@ struct ContentView: View {
                 Text("Face location X: \(faceDetectBoxPosition.x) Y: \(faceDetectBoxPosition.y)")
                 Text("Tap and face distance: \(tapFaceDistance ?? 99999)")
                 Text("HapticsIntensity: \(hapticsIntensity)")
+            }
+            
+            if previewPhoto != nil {
+                Image(uiImage: previewPhoto!)
+//                    .frame(width: 100, height: 100)
+                    .resizable()
+                    .scaledToFit()
             }
         }
     }
