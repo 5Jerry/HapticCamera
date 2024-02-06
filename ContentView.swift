@@ -1,6 +1,7 @@
 import SwiftUI
 import UIKit
 import CoreHaptics
+import Photos
 
 struct ContentView: View {
     private let initialSharpness: Float = 0.3
@@ -38,7 +39,8 @@ struct ContentView: View {
                 
                 HStack {
                     Button(action: {
-                        
+                        savePhoto()
+                        showPhoto = false
                     }) {
                         Image(systemName: "square.and.arrow.down")
                     }
@@ -65,6 +67,25 @@ struct ContentView: View {
             .padding(5)
             .background(.black)
             .cornerRadius(10)
+        }
+    }
+    
+    func savePhoto() {
+        guard let previewImage = self.previewPhoto else { return }
+        
+        PHPhotoLibrary.requestAuthorization(for: .addOnly) { (status) in
+            if status == .authorized {
+                do {
+                    try PHPhotoLibrary.shared().performChangesAndWait {
+                        PHAssetChangeRequest.creationRequestForAsset(from: previewImage)
+                        print("photo has saved in library...")
+                    }
+                } catch let error {
+                    print("failed to save photo in library: ", error)
+                }
+            } else {
+                print("Something went wrong with permission...")
+            }
         }
     }
 }

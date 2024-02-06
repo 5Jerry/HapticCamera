@@ -33,7 +33,8 @@ let package = Package(
                 .portraitUpsideDown(.when(deviceFamilies: [.pad]))
             ],
             capabilities: [
-                .camera(purposeString: "Camera preview permission")
+                .camera(purposeString: "Camera preview permission"),
+                .photoLibraryAdd(purposeString: "Photo library permission")
             ]
         )
     ],
