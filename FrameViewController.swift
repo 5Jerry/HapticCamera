@@ -37,6 +37,7 @@ class FrameViewController: UIViewController {
     private var continuousPlayer: CHHapticAdvancedPatternPlayer?
     
     var tappedLocation: CGPoint?
+    var tappedLocationCircle: CAShapeLayer = CAShapeLayer()
     
     private var deviceOrientation: UIDeviceOrientation {
         var orientation = UIDevice.current.orientation
@@ -160,6 +161,23 @@ class FrameViewController: UIViewController {
         let touchPoint = touch.location(in: self.view)
         print("1234 Tapped position x: \(touchPoint.x) Tapped position y: \(touchPoint.y)")
         tappedLocation = touchPoint
+        
+        tappedLocationCircle.removeFromSuperlayer()
+        
+        let circlePath = UIBezierPath(arcCenter: touchPoint, radius: CGFloat(10), startAngle: CGFloat(0), endAngle: CGFloat(Double.pi * 2), clockwise: true)
+            
+        let shapeLayer = CAShapeLayer()
+        shapeLayer.path = circlePath.cgPath
+            
+        // Change the fill color
+        shapeLayer.fillColor = UIColor.blue.cgColor
+        // You can change the stroke color
+        shapeLayer.strokeColor = UIColor.blue.cgColor
+        // You can change the line width
+        shapeLayer.lineWidth = 1.0
+            
+        view.layer.addSublayer(shapeLayer)
+        tappedLocationCircle = shapeLayer
         
         delegate?.setBoxCenter(tappedLocation: tappedLocation, midX: nil, midY: nil, tappedLocationAndFaceDistance: nil)
     }
@@ -402,7 +420,7 @@ extension FrameViewController: AVCapturePhotoCaptureDelegate {
 
 struct FrameViewControllerRepresentable: UIViewControllerRepresentable {
     @Binding var faceDetectBoxPosition: CGPoint
-    @Binding var tappedLocation: CGPoint
+    @Binding var tappedLocation: CGPoint?
     @Binding var tapFaceDistance: CGFloat?
     @Binding var hapticsIntensity: Float
     @Binding var previewPhoto: UIImage?
@@ -424,6 +442,27 @@ struct FrameViewControllerRepresentable: UIViewControllerRepresentable {
             frameViewController.setHapticsIntensity(tappedLocationAndFaceDistance: nil)
         } else {
             frameViewController.startCaptureSession()
+        }
+        
+        frameViewController.tappedLocation = tappedLocation
+        
+        frameViewController.tappedLocationCircle.removeFromSuperlayer()
+        
+        if tappedLocation != nil {
+            let circlePath = UIBezierPath(arcCenter: tappedLocation!, radius: CGFloat(10), startAngle: CGFloat(0), endAngle: CGFloat(Double.pi * 2), clockwise: true)
+            
+            let shapeLayer = CAShapeLayer()
+            shapeLayer.path = circlePath.cgPath
+            
+            // Change the fill color
+            shapeLayer.fillColor = UIColor.blue.cgColor
+            // You can change the stroke color
+            shapeLayer.strokeColor = UIColor.blue.cgColor
+            // You can change the line width
+            shapeLayer.lineWidth = 1.0
+            
+            frameViewController.view.layer.addSublayer(shapeLayer)
+            frameViewController.tappedLocationCircle = shapeLayer
         }
     }
     
@@ -492,16 +531,3 @@ fileprivate extension Image.Orientation {
         }
     }
 }
-
-//struct FrameView: View {
-//    var image: CGImage?
-//    private let label = Text("frame")
-//    
-//    var body: some View {
-//        if let image = image {
-//            Image(image, scale: 1.0, orientation: .up, label: label)
-//        } else {
-//            Color.black
-//        }
-//    }
-//}

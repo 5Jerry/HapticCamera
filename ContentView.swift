@@ -9,7 +9,7 @@ struct ContentView: View {
     @State var hapticsIntensity: Float = 0.0
     @State private var engine: CHHapticEngine?
     @State var faceDetectBoxPosition: CGPoint = CGPoint(x: 0, y: 0)
-    @State var tappedLocation: CGPoint = CGPoint(x: UIScreen.main.bounds.midX, y: UIScreen.main.bounds.midY)
+    @State var tappedLocation: CGPoint?
     @State var tapFaceDistance: CGFloat?
     @State var previewPhoto: UIImage?
     
@@ -21,11 +21,37 @@ struct ContentView: View {
     var body: some View {
         ZStack{
             FrameViewControllerRepresentable(faceDetectBoxPosition: $faceDetectBoxPosition, tappedLocation: $tappedLocation, tapFaceDistance: $tapFaceDistance, hapticsIntensity: $hapticsIntensity, previewPhoto: $previewPhoto, showPhoto: $showPhoto)
-            VStack {
-                Text("Tapped location X: \(tappedLocation.x) Y: \(tappedLocation.y)")
-                Text("Face location X: \(faceDetectBoxPosition.x) Y: \(faceDetectBoxPosition.y)")
-                Text("Tap and face distance: \(tapFaceDistance ?? 99999)")
-                Text("HapticsIntensity: \(hapticsIntensity)")
+//            VStack {
+//                if tappedLocation != nil {
+//                    Text("Tapped location X: \(tappedLocation!.x) Y: \(tappedLocation!.y)")
+//                }
+//                Text("Face location X: \(faceDetectBoxPosition.x) Y: \(faceDetectBoxPosition.y)")
+//                Text("Tap and face distance: \(tapFaceDistance ?? 99999)")
+//                Text("HapticsIntensity: \(hapticsIntensity)")
+//            }
+            if tappedLocation == nil {
+                VStack(alignment: .center) {
+//                            Text("Title")
+//                                .font(.title)
+//                            Text("Content")
+//                                .font(.body)
+                            Text("Tap the screen to indicate\n the desired face location")
+                                .background(.black)
+                                .foregroundStyle(.white)
+                                .font(.headline)
+                                .opacity(1.0)
+                        }
+                        .frame(
+                            maxWidth: .infinity,
+                            maxHeight: .infinity,
+                            alignment: .center
+                        )
+                        .background(.white)
+                        .opacity(0.5)
+                        .onTapGesture { location in
+                            tappedLocation = location
+                            print("Tapped at \(location)")
+                        }
             }
         }
         .popover(isPresented: $showPhoto,
@@ -59,7 +85,7 @@ struct ContentView: View {
         })
         .safeAreaInset(edge: .bottom, spacing: 0) {
             Button(action: {
-                
+                tappedLocation = nil
             }) {
                 Text("Clear tap position")
             }
