@@ -12,7 +12,7 @@ import Vision
 import CoreHaptics
 
 protocol BoxCenterDelegate {
-    func setBoxCenter(tappedLocation: CGPoint?, midX: CGFloat?, midY: CGFloat?, tappedLocationAndFaceDistance: CGFloat?)
+    func setBoxCenter(tappedLocation: CGPoint?)
     func getPhoto(photo: AVCapturePhoto)
 }
 
@@ -38,6 +38,12 @@ class FrameViewController: UIViewController {
     
     var tappedLocation: CGPoint?
     var tappedLocationCircle: CAShapeLayer = CAShapeLayer()
+    
+    private var timer: Timer?
+    private var blinkCounter: Int = 0
+    
+    private var flashlightOn = true
+    private let blinkFlashlightQueue = DispatchQueue(label: "blinkFlashlightQueue")
     
     private var deviceOrientation: UIDeviceOrientation {
         var orientation = UIDevice.current.orientation
@@ -179,7 +185,7 @@ class FrameViewController: UIViewController {
         view.layer.addSublayer(shapeLayer)
         tappedLocationCircle = shapeLayer
         
-        delegate?.setBoxCenter(tappedLocation: tappedLocation, midX: nil, midY: nil, tappedLocationAndFaceDistance: nil)
+        delegate?.setBoxCenter(tappedLocation: tappedLocation)
     }
     
     func setupCaptureSession() {
@@ -236,7 +242,7 @@ class FrameViewController: UIViewController {
                     self.drawFaceDetectBoxes(observedFaces: results)
                 } else {
                     self.clearBoxes()
-                    self.delegate?.setBoxCenter(tappedLocation: self.tappedLocation, midX: nil, midY: nil, tappedLocationAndFaceDistance: nil)
+                    self.delegate?.setBoxCenter(tappedLocation: self.tappedLocation)
                     self.setHapticsIntensity(tappedLocationAndFaceDistance: nil)
                 }
             }
@@ -301,11 +307,19 @@ class FrameViewController: UIViewController {
         
         setHapticsIntensity(tappedLocationAndFaceDistance: tappedLocationAndFaceDistance)
         
-        delegate?.setBoxCenter(tappedLocation: tappedLocation, midX: CGRectGetMidX(faceBoundingBoxOnScreen), midY: CGRectGetMidY(faceBoundingBoxOnScreen), tappedLocationAndFaceDistance: tappedLocationAndFaceDistance)
+        delegate?.setBoxCenter(tappedLocation: tappedLocation)
         
-        if tappedLocationAndFaceDistance < 10 {
-            takePhoto()
+        if tappedLocationAndFaceDistance < 50 {
+            self.takePhoto()
         }
+        
+//        if tappedLocationAndFaceDistance < 50 && blinkCounter < 3 {
+////            startCounter()
+//            blinkFlashlight(flashlightStatus: true, stopBlink: false)
+//        } else {
+////            stopCounter()
+//            blinkFlashlight(flashlightStatus: false, stopBlink: true)
+//        }
     }
     
     func clearBoxes() {
@@ -352,7 +366,7 @@ class FrameViewController: UIViewController {
                     photoOutputVideoConnection.videoOrientation = videoOrientation
                 }
             }
-            
+            self.tappedLocation = nil
             self.photoOutput.capturePhoto(with: photoSettings, delegate: self)
         }
     }
@@ -394,6 +408,94 @@ class FrameViewController: UIViewController {
         }
     }
     
+    func startCounter() {
+        timer = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { _ in
+            self.blinkCounter += 1
+            
+//            if self.captureDevice != nil && self.captureDevice!.hasTorch {
+//                if self.timeCounter % 2 == 0 {
+//                    self.captureDevice!.torchMode = .on
+//                } else {
+//                    self.captureDevice!.torchMode = .off
+//                }
+//            }
+            self.toggleFlash(on: self.flashlightOn)
+            self.flashlightOn = !self.flashlightOn
+            print("55555 timeCounter: \(self.flashlightOn)")
+            if self.blinkCounter == 6 {
+                print("55555 enter stop")
+                self.stopCounter()
+                self.tappedLocation = nil
+                self.takePhoto()
+            }
+        }
+    }
+
+    func stopCounter() {
+        flashlightOn = true
+        timer?.invalidate()
+        timer = nil
+        blinkCounter = 0
+        toggleFlash(on: false)
+    }
+    
+    func blinkFlashlight(flashlightStatus: Bool, stopBlink: Bool) {
+        guard let device = AVCaptureDevice.default(for: .video) else { return }
+        if device.hasTorch {
+            do {
+                try device.lockForConfiguration()
+                if flashlightStatus == true {
+                    device.torchMode = .on
+                } else {
+                    device.torchMode = .off
+                }
+                device.unlockForConfiguration()
+                
+                if stopBlink { return }
+                // delay until flash shows/hides you can make it 0.5 if you it more fast
+                blinkFlashlightQueue.asyncAfter(deadline: .now() + 1.5) {
+                    if self.blinkCounter <= 3 {
+                        let newFlashlightStatus = !flashlightStatus
+                        self.blinkFlashlight(flashlightStatus: newFlashlightStatus, stopBlink: false)
+                        self.blinkCounter += 1
+                    } else {
+                        self.blinkCounter = 0
+                        self.blinkFlashlight(flashlightStatus: false, stopBlink: true)
+                        self.takePhoto()
+                    }
+                }
+            } catch {
+                print("Torch could not be used")
+            }
+        } else {
+            print("Torch is not available")
+        }
+    }
+    
+    
+    
+    func toggleFlash(on: Bool) {
+        guard let device = AVCaptureDevice.default(for: .video) else { return }
+
+        if device.hasTorch {
+            do {
+                try device.lockForConfiguration()
+
+                if on == true {
+                    device.torchMode = .on
+                } else {
+                    device.torchMode = .off
+                }
+
+                device.unlockForConfiguration()
+            } catch {
+                print("Torch could not be used")
+            }
+        } else {
+            print("Torch is not available")
+        }
+    }
+    
     private func videoOrientationFor(_ deviceOrientation: UIDeviceOrientation) -> AVCaptureVideoOrientation? {
         switch deviceOrientation {
         case .portrait: return AVCaptureVideoOrientation.portrait
@@ -415,15 +517,18 @@ extension FrameViewController: AVCaptureVideoDataOutputSampleBufferDelegate {
 extension FrameViewController: AVCapturePhotoCaptureDelegate {
     func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto, error: Error?) {
         delegate?.getPhoto(photo: photo)
+        
+        
+        stopCaptureSession()
+        setHapticsIntensity(tappedLocationAndFaceDistance: nil)
+        tappedLocation = nil
+        tappedLocationCircle.removeFromSuperlayer()
     }
 }
 
 struct FrameViewControllerRepresentable: UIViewControllerRepresentable {
-    @Binding var faceDetectBoxPosition: CGPoint
     @Binding var tappedLocation: CGPoint?
-    @Binding var tapFaceDistance: CGFloat?
-    @Binding var hapticsIntensity: Float
-    @Binding var previewPhoto: UIImage?
+    @Binding var previewPhoto: UIImage
     @Binding var showPhoto: Bool
     
     func makeCoordinator() -> Coordinator {
@@ -473,19 +578,10 @@ struct FrameViewControllerRepresentable: UIViewControllerRepresentable {
             parent = uiViewController
         }
         
-        func setBoxCenter(tappedLocation: CGPoint?, midX: CGFloat?, midY: CGFloat?, tappedLocationAndFaceDistance: CGFloat?) {
-            if midX != nil && midY != nil {
-                parent.faceDetectBoxPosition = CGPoint(x: midX!, y: midY!)
-            }
-            
+        func setBoxCenter(tappedLocation: CGPoint?) {
             if tappedLocation != nil {
                 parent.tappedLocation = tappedLocation!
                 
-            }
-            
-            if tappedLocationAndFaceDistance != nil {
-                parent.tapFaceDistance = tappedLocationAndFaceDistance!
-                parent.hapticsIntensity = Float(1 - tappedLocationAndFaceDistance! / 800)
             }
         }
         
