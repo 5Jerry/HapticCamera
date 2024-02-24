@@ -43,7 +43,8 @@ class FrameViewController: UIViewController {
     private var blinkCounter: Int = 0
     
     private var flashlightOn = true
-    private let blinkFlashlightQueue = DispatchQueue(label: "blinkFlashlightQueue")
+    
+    var isNotInCountdown = true
     
     private var deviceOrientation: UIDeviceOrientation {
         var orientation = UIDevice.current.orientation
@@ -165,7 +166,6 @@ class FrameViewController: UIViewController {
     
     @objc func touchedScreen(touch: UITapGestureRecognizer) {
         let touchPoint = touch.location(in: self.view)
-        print("1234 Tapped position x: \(touchPoint.x) Tapped position y: \(touchPoint.y)")
         tappedLocation = touchPoint
         
         tappedLocationCircle.removeFromSuperlayer()
@@ -305,21 +305,19 @@ class FrameViewController: UIViewController {
         
         let tappedLocationAndFaceDistance = sqrt(pow(tappedLocation!.x - CGRectGetMidX(faceBoundingBoxOnScreen), 2) + pow(tappedLocation!.y - CGRectGetMidY(faceBoundingBoxOnScreen), 2))
         
-        setHapticsIntensity(tappedLocationAndFaceDistance: tappedLocationAndFaceDistance)
-        
         delegate?.setBoxCenter(tappedLocation: tappedLocation)
         
-        if tappedLocationAndFaceDistance < 50 {
-            self.takePhoto()
+        if tappedLocationAndFaceDistance < 100 && isNotInCountdown {
+            setHapticsIntensity(tappedLocationAndFaceDistance: nil)
+            isNotInCountdown = false
+            startCounter()
         }
         
-//        if tappedLocationAndFaceDistance < 50 && blinkCounter < 3 {
-////            startCounter()
-//            blinkFlashlight(flashlightStatus: true, stopBlink: false)
-//        } else {
-////            stopCounter()
-//            blinkFlashlight(flashlightStatus: false, stopBlink: true)
-//        }
+        if tappedLocationAndFaceDistance >= 100 {
+            setHapticsIntensity(tappedLocationAndFaceDistance: tappedLocationAndFaceDistance)
+            isNotInCountdown = true
+            stopCounter()
+        }
     }
     
     func clearBoxes() {
@@ -330,7 +328,6 @@ class FrameViewController: UIViewController {
     
     func takePhoto() {
         sessionQueue.async {
-        
             var photoSettings = AVCapturePhotoSettings()
 
             if self.photoOutput.availablePhotoCodecTypes.contains(.hevc) {
@@ -339,16 +336,11 @@ class FrameViewController: UIViewController {
             
             let isFlashAvailable = self.deviceInput?.device.isFlashAvailable ?? false
             photoSettings.flashMode = isFlashAvailable ? .auto : .off
-//            photoSettings.isHighResolutionPhotoEnabled = true
             
             if let maxPhotoDimensions = self.captureDevice?.activeFormat.formatDescription {
                 photoSettings.maxPhotoDimensions = CMVideoFormatDescriptionGetDimensions(maxPhotoDimensions)
                 print("5555 maxPhotoDimensions width: \(CMVideoFormatDescriptionGetDimensions(maxPhotoDimensions).width) maxPhotoDimensions height: \(CMVideoFormatDescriptionGetDimensions(maxPhotoDimensions).height)")
             }
-            
-//            if let previewPhotoPixelFormatType = photoSettings.availablePreviewPhotoPixelFormatTypes.first {
-//                photoSettings.previewPhotoFormat = [kCVPixelBufferPixelFormatTypeKey as String: previewPhotoPixelFormatType]
-//            }
             
             if photoSettings.availablePreviewPhotoPixelFormatTypes.count > 0 {
                 photoSettings.previewPhotoFormat = [
@@ -409,21 +401,11 @@ class FrameViewController: UIViewController {
     }
     
     func startCounter() {
-        timer = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { _ in
+        timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { _ in
             self.blinkCounter += 1
-            
-//            if self.captureDevice != nil && self.captureDevice!.hasTorch {
-//                if self.timeCounter % 2 == 0 {
-//                    self.captureDevice!.torchMode = .on
-//                } else {
-//                    self.captureDevice!.torchMode = .off
-//                }
-//            }
             self.toggleFlash(on: self.flashlightOn)
             self.flashlightOn = !self.flashlightOn
-            print("55555 timeCounter: \(self.flashlightOn)")
             if self.blinkCounter == 6 {
-                print("55555 enter stop")
                 self.stopCounter()
                 self.tappedLocation = nil
                 self.takePhoto()
@@ -438,41 +420,6 @@ class FrameViewController: UIViewController {
         blinkCounter = 0
         toggleFlash(on: false)
     }
-    
-    func blinkFlashlight(flashlightStatus: Bool, stopBlink: Bool) {
-        guard let device = AVCaptureDevice.default(for: .video) else { return }
-        if device.hasTorch {
-            do {
-                try device.lockForConfiguration()
-                if flashlightStatus == true {
-                    device.torchMode = .on
-                } else {
-                    device.torchMode = .off
-                }
-                device.unlockForConfiguration()
-                
-                if stopBlink { return }
-                // delay until flash shows/hides you can make it 0.5 if you it more fast
-                blinkFlashlightQueue.asyncAfter(deadline: .now() + 1.5) {
-                    if self.blinkCounter <= 3 {
-                        let newFlashlightStatus = !flashlightStatus
-                        self.blinkFlashlight(flashlightStatus: newFlashlightStatus, stopBlink: false)
-                        self.blinkCounter += 1
-                    } else {
-                        self.blinkCounter = 0
-                        self.blinkFlashlight(flashlightStatus: false, stopBlink: true)
-                        self.takePhoto()
-                    }
-                }
-            } catch {
-                print("Torch could not be used")
-            }
-        } else {
-            print("Torch is not available")
-        }
-    }
-    
-    
     
     func toggleFlash(on: Bool) {
         guard let device = AVCaptureDevice.default(for: .video) else { return }
@@ -498,11 +445,11 @@ class FrameViewController: UIViewController {
     
     private func videoOrientationFor(_ deviceOrientation: UIDeviceOrientation) -> AVCaptureVideoOrientation? {
         switch deviceOrientation {
-        case .portrait: return AVCaptureVideoOrientation.portrait
-        case .portraitUpsideDown: return AVCaptureVideoOrientation.portraitUpsideDown
-        case .landscapeLeft: return AVCaptureVideoOrientation.landscapeRight
-        case .landscapeRight: return AVCaptureVideoOrientation.landscapeLeft
-        default: return nil
+            case .portrait: return AVCaptureVideoOrientation.portrait
+            case .portraitUpsideDown: return AVCaptureVideoOrientation.portraitUpsideDown
+            case .landscapeLeft: return AVCaptureVideoOrientation.landscapeRight
+            case .landscapeRight: return AVCaptureVideoOrientation.landscapeLeft
+            default: return nil
         }
     }
 }
@@ -547,6 +494,7 @@ struct FrameViewControllerRepresentable: UIViewControllerRepresentable {
             frameViewController.setHapticsIntensity(tappedLocationAndFaceDistance: nil)
         } else {
             frameViewController.startCaptureSession()
+            frameViewController.isNotInCountdown = true
         }
         
         frameViewController.tappedLocation = tappedLocation
@@ -568,6 +516,8 @@ struct FrameViewControllerRepresentable: UIViewControllerRepresentable {
             
             frameViewController.view.layer.addSublayer(shapeLayer)
             frameViewController.tappedLocationCircle = shapeLayer
+        } else {
+            frameViewController.setHapticsIntensity(tappedLocationAndFaceDistance: nil)
         }
     }
     
@@ -581,7 +531,6 @@ struct FrameViewControllerRepresentable: UIViewControllerRepresentable {
         func setBoxCenter(tappedLocation: CGPoint?) {
             if tappedLocation != nil {
                 parent.tappedLocation = tappedLocation!
-                
             }
         }
         
@@ -590,40 +539,6 @@ struct FrameViewControllerRepresentable: UIViewControllerRepresentable {
             guard let uiImage = UIImage(data: imageData) else { return }
             parent.previewPhoto = uiImage
             parent.showPhoto = true
-        }
-    }
-}
-
-fileprivate extension UIScreen {
-
-    var orientation: UIDeviceOrientation {
-        let point = coordinateSpace.convert(CGPoint.zero, to: fixedCoordinateSpace)
-        if point == CGPoint.zero {
-            return .portrait
-        } else if point.x != 0 && point.y != 0 {
-            return .portraitUpsideDown
-        } else if point.x == 0 && point.y != 0 {
-            return .landscapeRight //.landscapeLeft
-        } else if point.x != 0 && point.y == 0 {
-            return .landscapeLeft //.landscapeRight
-        } else {
-            return .unknown
-        }
-    }
-}
-
-fileprivate extension Image.Orientation {
-
-    init(_ cgImageOrientation: CGImagePropertyOrientation) {
-        switch cgImageOrientation {
-        case .up: self = .up
-        case .upMirrored: self = .upMirrored
-        case .down: self = .down
-        case .downMirrored: self = .downMirrored
-        case .left: self = .left
-        case .leftMirrored: self = .leftMirrored
-        case .right: self = .right
-        case .rightMirrored: self = .rightMirrored
         }
     }
 }
