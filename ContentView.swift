@@ -14,7 +14,8 @@ struct ContentView: View {
             FrameViewControllerRepresentable(tappedLocation: $tappedLocation, previewPhoto: $previewPhoto, showPhoto: $showPhoto)
             if tappedLocation == nil {
                 VStack(alignment: .center) {
-                    Text("Tap the screen to indicate\n the desired face location")
+                    Text("Rotate device first for photo orientation\n Then tap the screen to indicate\n the desired face location")
+                        .frame(alignment: .center)
                         .background(.black)
                         .foregroundStyle(.white)
                         .font(.headline)
@@ -56,6 +57,9 @@ struct ContentView: View {
                             Image(systemName: "square.and.arrow.down")
                         }
                         .frame(width: 40, height: 40)
+                        .background(.white)
+                        .cornerRadius(7)
+                        .padding(EdgeInsets(top: 5, leading: 5, bottom: 5, trailing: 5))
                         
                         Button(action: {
                             tappedLocation = nil
@@ -65,8 +69,11 @@ struct ContentView: View {
                             Image(systemName: "xmark")
                         }
                         .frame(width: 40, height: 40)
+                        .background(.white)
+                        .cornerRadius(7)
+                        .padding(EdgeInsets(top: 5, leading: 5, bottom: 5, trailing: 5))
                     }
-                    .frame(width: 100, height: 40, alignment: .topTrailing)
+                    .frame(width: 100, height: 50, alignment: .topTrailing)
                 }
             }
             .presentationCompactAdaptation(.fullScreenCover)

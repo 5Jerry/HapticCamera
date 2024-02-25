@@ -19,7 +19,7 @@ protocol BoxCenterDelegate {
 class FrameViewController: UIViewController {
     
     private var faceDetectBoxes: [CAShapeLayer] = []
-    private var permissionGranted = true
+    private var permissionGranted = false
     private var captureDevice: AVCaptureDevice?
     private var deviceInput: AVCaptureDeviceInput?
     private let videoOutput = AVCaptureVideoDataOutput()
@@ -167,21 +167,9 @@ class FrameViewController: UIViewController {
     @objc func touchedScreen(touch: UITapGestureRecognizer) {
         let touchPoint = touch.location(in: self.view)
         tappedLocation = touchPoint
-        
         tappedLocationCircle.removeFromSuperlayer()
-        
-        let circlePath = UIBezierPath(arcCenter: touchPoint, radius: CGFloat(10), startAngle: CGFloat(0), endAngle: CGFloat(Double.pi * 2), clockwise: true)
             
-        let shapeLayer = CAShapeLayer()
-        shapeLayer.path = circlePath.cgPath
-            
-        // Change the fill color
-        shapeLayer.fillColor = UIColor.blue.cgColor
-        // You can change the stroke color
-        shapeLayer.strokeColor = UIColor.blue.cgColor
-        // You can change the line width
-        shapeLayer.lineWidth = 1.0
-            
+        let shapeLayer = drawCirclePath(touchPoint: touchPoint)
         view.layer.addSublayer(shapeLayer)
         tappedLocationCircle = shapeLayer
         
@@ -307,12 +295,14 @@ class FrameViewController: UIViewController {
         
         delegate?.setBoxCenter(tappedLocation: tappedLocation)
         
+        // Start timer
         if tappedLocationAndFaceDistance < 100 && isNotInCountdown {
             setHapticsIntensity(tappedLocationAndFaceDistance: nil)
             isNotInCountdown = false
             startCounter()
         }
         
+        // Stop timer
         if tappedLocationAndFaceDistance >= 100 {
             setHapticsIntensity(tappedLocationAndFaceDistance: tappedLocationAndFaceDistance)
             isNotInCountdown = true
@@ -365,7 +355,22 @@ class FrameViewController: UIViewController {
     
     func setHapticsIntensity(tappedLocationAndFaceDistance: CGFloat?) {
         if tappedLocationAndFaceDistance != nil {
-            let hapticsIntensity = Float(1 - tappedLocationAndFaceDistance! / 800)
+            var hapticsIntensity: Float = 0.0
+            
+            // hapticsIntensity 0.1 ~ 0.2
+            if tappedLocationAndFaceDistance! > 400 {
+                hapticsIntensity = Float(0.64 - tappedLocationAndFaceDistance! / 900) <= 0 ? 0.1 : Float(0.64 - tappedLocationAndFaceDistance! / 900)
+            }
+            
+            // hapticsIntensity 0.2 ~ 0.4
+            if tappedLocationAndFaceDistance! > 200 && tappedLocationAndFaceDistance! <= 400 {
+                hapticsIntensity = Float(1 - tappedLocationAndFaceDistance! / 500)
+            }
+            
+            // hapticsIntensity 0.4 ~ 1.0
+            if tappedLocationAndFaceDistance! <= 200 {
+                hapticsIntensity = Float(0.6 - (tappedLocationAndFaceDistance! * 0.006 - 0.6) + 0.4)
+            }
             
             // Create dynamic parameters for the updated intensity & sharpness.
             let intensityParameter = CHHapticDynamicParameter(parameterID: .hapticIntensityControl,
@@ -400,6 +405,7 @@ class FrameViewController: UIViewController {
         }
     }
     
+    // Blink flashlight 3 times with timer then take photo
     func startCounter() {
         timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { _ in
             self.blinkCounter += 1
@@ -413,6 +419,7 @@ class FrameViewController: UIViewController {
         }
     }
 
+    // Stop timer
     func stopCounter() {
         flashlightOn = true
         timer?.invalidate()
@@ -443,6 +450,18 @@ class FrameViewController: UIViewController {
         }
     }
     
+    func drawCirclePath(touchPoint: CGPoint) -> CAShapeLayer {
+        let circlePath = UIBezierPath(arcCenter: touchPoint, radius: CGFloat(10), startAngle: CGFloat(0), endAngle: CGFloat(Double.pi * 2), clockwise: true)
+            
+        let shapeLayer = CAShapeLayer()
+        shapeLayer.path = circlePath.cgPath
+        
+        shapeLayer.fillColor = UIColor.blue.cgColor
+        shapeLayer.strokeColor = UIColor.blue.cgColor
+        shapeLayer.lineWidth = 1.0
+        return shapeLayer
+    }
+    
     private func videoOrientationFor(_ deviceOrientation: UIDeviceOrientation) -> AVCaptureVideoOrientation? {
         switch deviceOrientation {
             case .portrait: return AVCaptureVideoOrientation.portrait
@@ -464,7 +483,6 @@ extension FrameViewController: AVCaptureVideoDataOutputSampleBufferDelegate {
 extension FrameViewController: AVCapturePhotoCaptureDelegate {
     func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto, error: Error?) {
         delegate?.getPhoto(photo: photo)
-        
         
         stopCaptureSession()
         setHapticsIntensity(tappedLocationAndFaceDistance: nil)
@@ -489,6 +507,7 @@ struct FrameViewControllerRepresentable: UIViewControllerRepresentable {
     }
 
     func updateUIViewController(_ frameViewController: FrameViewController, context: Context) {
+        // Stop capture session and haptics when showing preview photos, after closing the preview view resume capture session
         if showPhoto {
             frameViewController.stopCaptureSession()
             frameViewController.setHapticsIntensity(tappedLocationAndFaceDistance: nil)
@@ -497,23 +516,11 @@ struct FrameViewControllerRepresentable: UIViewControllerRepresentable {
             frameViewController.isNotInCountdown = true
         }
         
+        // Update tappedlocation in frameViewController when tappedLocation gets updated from ContentView
         frameViewController.tappedLocation = tappedLocation
-        
         frameViewController.tappedLocationCircle.removeFromSuperlayer()
-        
         if tappedLocation != nil {
-            let circlePath = UIBezierPath(arcCenter: tappedLocation!, radius: CGFloat(10), startAngle: CGFloat(0), endAngle: CGFloat(Double.pi * 2), clockwise: true)
-            
-            let shapeLayer = CAShapeLayer()
-            shapeLayer.path = circlePath.cgPath
-            
-            // Change the fill color
-            shapeLayer.fillColor = UIColor.blue.cgColor
-            // You can change the stroke color
-            shapeLayer.strokeColor = UIColor.blue.cgColor
-            // You can change the line width
-            shapeLayer.lineWidth = 1.0
-            
+            let shapeLayer = frameViewController.drawCirclePath(touchPoint: tappedLocation!)
             frameViewController.view.layer.addSublayer(shapeLayer)
             frameViewController.tappedLocationCircle = shapeLayer
         } else {
