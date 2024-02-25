@@ -41,9 +41,7 @@ class FrameViewController: UIViewController {
     
     private var timer: Timer?
     private var blinkCounter: Int = 0
-    
     private var flashlightOn = true
-    
     var isNotInCountdown = true
     
     private var deviceOrientation: UIDeviceOrientation {
@@ -178,7 +176,6 @@ class FrameViewController: UIViewController {
     
     func setupCaptureSession() {
         // Camera input
-//        guard let videoDevice = AVCaptureDevice.default(.builtInUltraWideCamera, for: .video, position: .back) else { return }
         guard let videoDevice = AVCaptureDevice.default(for: AVMediaType.video) else { return }
         captureDevice = videoDevice
         guard let videoDeviceInput = try? AVCaptureDeviceInput(device: videoDevice) else { return }
@@ -244,32 +241,7 @@ class FrameViewController: UIViewController {
     func drawFaceDetectBoxes(observedFaces: [VNFaceObservation]) {
         clearBoxes()
         
-//        // Draw the boxes
-//        let facesBoundingBoxes: [CAShapeLayer] = observedFaces.map({ (observedFace: VNFaceObservation) -> CAShapeLayer in
-//            // Get box boundary from VNFaceObservation
-//            let faceBoundingBoxOnScreen = previewLayer.layerRectConverted(fromMetadataOutputRect: observedFace.boundingBox)
-//            let faceBoundingBoxPath = CGPath(rect: faceBoundingBoxOnScreen, transform: nil)
-//            let faceBoundingBoxShape = CAShapeLayer()
-//            
-//            var midX = CGRectGetMidX(faceBoundingBoxOnScreen)
-//            var midY = CGRectGetMidY(faceBoundingBoxOnScreen)
-//              
-//            // Set properties of the box shape
-//            faceBoundingBoxShape.path = faceBoundingBoxPath
-//            faceBoundingBoxShape.fillColor = UIColor.clear.cgColor
-//            faceBoundingBoxShape.strokeColor = UIColor.green.cgColor
-//              
-//            return faceBoundingBoxShape
-//        })
-//        
-//        // Add boxes to the view layer and the array
-//        facesBoundingBoxes.forEach { faceBoundingBox in
-//            view.layer.addSublayer(faceBoundingBox)
-//            faceDetectBoxes = facesBoundingBoxes
-//        }
-        
         // Draw the box of the first face detected
-        
         // Get box boundary from VNFaceObservation
         guard let faceBoundingBox: VNFaceObservation = observedFaces.first else {
             return
@@ -283,9 +255,8 @@ class FrameViewController: UIViewController {
         faceBoundingBoxShape.fillColor = UIColor.clear.cgColor
         faceBoundingBoxShape.strokeColor = UIColor.green.cgColor
         
-        // Add boxes to the view layer and the array
+        // Add box to the view layer and the array
         let singleFaceBoundingBoxShape: [CAShapeLayer] = [faceBoundingBoxShape]
-//        singleFaceBoundingBoxShape.append(faceBoundingBoxShape)
         view.layer.addSublayer(faceBoundingBoxShape)
         faceDetectBoxes = singleFaceBoundingBoxShape
         
@@ -326,20 +297,6 @@ class FrameViewController: UIViewController {
             
             let isFlashAvailable = self.deviceInput?.device.isFlashAvailable ?? false
             photoSettings.flashMode = isFlashAvailable ? .auto : .off
-            
-            if let maxPhotoDimensions = self.captureDevice?.activeFormat.formatDescription {
-                photoSettings.maxPhotoDimensions = CMVideoFormatDescriptionGetDimensions(maxPhotoDimensions)
-                print("5555 maxPhotoDimensions width: \(CMVideoFormatDescriptionGetDimensions(maxPhotoDimensions).width) maxPhotoDimensions height: \(CMVideoFormatDescriptionGetDimensions(maxPhotoDimensions).height)")
-            }
-            
-            if photoSettings.availablePreviewPhotoPixelFormatTypes.count > 0 {
-                photoSettings.previewPhotoFormat = [
-                    kCVPixelBufferPixelFormatTypeKey : photoSettings.availablePreviewPhotoPixelFormatTypes.first!,
-                    kCVPixelBufferWidthKey : 1920,
-                    kCVPixelBufferHeightKey : 1080
-                ] as [String: Any]
-            }
-            
             photoSettings.photoQualityPrioritization = .quality
             
             if let photoOutputVideoConnection = self.photoOutput.connection(with: .video) {

@@ -15,7 +15,6 @@ struct ContentView: View {
             if tappedLocation == nil {
                 VStack(alignment: .center) {
                     Text("Rotate device first for photo orientation\n Then tap the screen to indicate\n the desired face location")
-                        .frame(alignment: .center)
                         .background(.black)
                         .foregroundStyle(.white)
                         .font(.headline)
