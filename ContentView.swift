@@ -12,6 +12,52 @@ struct ContentView: View {
     var body: some View {
         ZStack{
             FrameViewControllerRepresentable(tappedLocation: $tappedLocation, previewPhoto: $previewPhoto, showPhoto: $showPhoto)
+                .popover(isPresented: $showPhoto,
+                         attachmentAnchor: .point(.center),
+                         content: {
+                    ZStack(alignment: .topTrailing) {
+                        Button(action: {
+                            showPreviewImage = true
+                        }) {
+                            Text("Show preview image")
+                        }
+                        
+                        if showPreviewImage {
+                            Image(uiImage: previewPhoto)
+                                .resizable()
+                                .scaledToFit()
+                            
+                            HStack {
+                                Button(action: {
+                                    savePhoto()
+                                    tappedLocation = nil
+                                    showPhoto = false
+                                    showPreviewImage = false
+                                }) {
+                                    Image(systemName: "square.and.arrow.down")
+                                }
+                                .frame(width: 40, height: 40)
+                                .background(.white)
+                                .cornerRadius(7)
+                                .padding(EdgeInsets(top: 5, leading: 5, bottom: 5, trailing: 5))
+                                
+                                Button(action: {
+                                    tappedLocation = nil
+                                    showPhoto = false
+                                    showPreviewImage = false
+                                }) {
+                                    Image(systemName: "xmark")
+                                }
+                                .frame(width: 40, height: 40)
+                                .background(.white)
+                                .cornerRadius(7)
+                                .padding(EdgeInsets(top: 5, leading: 5, bottom: 5, trailing: 5))
+                            }
+                            .frame(width: 100, height: 50, alignment: .topTrailing)
+                        }
+                    }
+                    .interactiveDismissDisabled()
+                })
             if tappedLocation == nil {
                 VStack(alignment: .center) {
                     Text("Rotate device first for photo orientation\n Then tap the screen to indicate\n the desired face location")
@@ -32,51 +78,6 @@ struct ContentView: View {
                 }
             }
         }
-        .popover(isPresented: $showPhoto,
-                 content: {
-            ZStack(alignment: .topTrailing) {
-                Button(action: {
-                    showPreviewImage = true
-                }) {
-                    Text("Show preview image")
-                }
-                
-                if showPreviewImage {
-                    Image(uiImage: previewPhoto)
-                        .resizable()
-                        .scaledToFit()
-                    
-                    HStack {
-                        Button(action: {
-                            savePhoto()
-                            tappedLocation = nil
-                            showPhoto = false
-                            showPreviewImage = false
-                        }) {
-                            Image(systemName: "square.and.arrow.down")
-                        }
-                        .frame(width: 40, height: 40)
-                        .background(.white)
-                        .cornerRadius(7)
-                        .padding(EdgeInsets(top: 5, leading: 5, bottom: 5, trailing: 5))
-                        
-                        Button(action: {
-                            tappedLocation = nil
-                            showPhoto = false
-                            showPreviewImage = false
-                        }) {
-                            Image(systemName: "xmark")
-                        }
-                        .frame(width: 40, height: 40)
-                        .background(.white)
-                        .cornerRadius(7)
-                        .padding(EdgeInsets(top: 5, leading: 5, bottom: 5, trailing: 5))
-                    }
-                    .frame(width: 100, height: 50, alignment: .topTrailing)
-                }
-            }
-            .presentationCompactAdaptation(.fullScreenCover)
-        })
         .safeAreaInset(edge: .bottom, spacing: 0) {
             Button(action: {
                 tappedLocation = nil
